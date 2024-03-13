@@ -22,7 +22,7 @@ set(MICROPY_PORT_DIR ${CMAKE_SOURCE_DIR})
 
 # Set the board if it's not already set.
 if(NOT MICROPY_BOARD)
-    set(MICROPY_BOARD PICO)
+    set(MICROPY_BOARD RPI_PICO)
 endif()
 
 # Set the board directory and check that it exists.
@@ -58,7 +58,7 @@ add_executable(${MICROPY_TARGET})
 if(CAN OR CRYPTOCAN)
     set(CANDRIVERS_PATH ${MICROPY_PORT_DIR}/canis/candrivers)
     set(CANDRIVERS_SOURCE_LIB
-        ${CANDRIVERS_PATH}/mcp2517fd/mcp2517fd.c
+        ${CANDRIVERS_PATH}/mcp25xxfd/mcp25xxfd.c
     )
 endif()
 
@@ -108,7 +108,7 @@ set(MICROPY_SOURCE_LIB
     ${MICROPY_DIR}/lib/oofatfs/ffunicode.c
     ${MICROPY_DIR}/shared/netutils/netutils.c
     ${MICROPY_DIR}/shared/readline/readline.c
-    ${MICROPY_DIR}/shared/runtime/gchelper_m0.s
+    ${MICROPY_DIR}/shared/runtime/gchelper_thumb1.s
     ${MICROPY_DIR}/shared/runtime/gchelper_native.c
     ${MICROPY_DIR}/shared/runtime/mpirq.c
     ${MICROPY_DIR}/shared/runtime/pyexec.c
@@ -137,8 +137,8 @@ set(MICROPY_SOURCE_PORT
     main.c
     modmachine.c
     modrp2.c
-    moduos.c
-    modutime.c
+    modos.c
+    modtime.c
     mphalport.c
     mpthreadport.c
     rp2_flash.c
