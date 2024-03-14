@@ -763,21 +763,25 @@ static mp_obj_t rp2_can_test_spi_set(mp_obj_t self_in)
 static MP_DEFINE_CONST_FUN_OBJ_1(rp2_can_test_spi_set_fun_obj, rp2_can_test_spi_set);
 static MP_DEFINE_CONST_STATICMETHOD_OBJ(rp2_can_test_spi_set_obj, MP_ROM_PTR(&rp2_can_test_spi_set_fun_obj));
 
-static mp_obj_t rp2_can_test_spi_deselect(void)
+static mp_obj_t rp2_can_test_spi_deselect(mp_obj_t self_in)
 {
-    mcp25xxfd_spi_deselect();
+    rp2_can_obj_t *self = self_in;
+    can_interface_t *spi_interface = &self->controller.host_interface;
+    mcp25xxfd_spi_deselect(spi_interface);
     return mp_const_none;
 }
-static MP_DEFINE_CONST_FUN_OBJ_0(rp2_can_test_spi_deselect_fun_obj, rp2_can_test_spi_deselect);
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_can_test_spi_deselect_fun_obj, rp2_can_test_spi_deselect);
 static MP_DEFINE_CONST_STATICMETHOD_OBJ(rp2_can_test_spi_deselect_obj, MP_ROM_PTR(&rp2_can_test_spi_deselect_fun_obj));
 
-static mp_obj_t rp2_can_test_spi_write_word(mp_obj_t addr_obj, mp_obj_t word_obj)
+static mp_obj_t rp2_can_test_spi_write_word(mp_obj_t self_in, mp_obj_t addr_obj, mp_obj_t word_obj)
 {
+    rp2_can_obj_t *self = self_in;
+    can_interface_t *spi_interface = &self->controller.host_interface;
     uint32_t addr = mp_obj_get_int(addr_obj);
     uint32_t word = mp_obj_get_int(word_obj);
 
     CAN_DEBUG_PRINT("Writing word=0x%08"PRIx32"\n", word);
-    mcp25xxfd_spi_gpio_disable_irq();
+    mcp25xxfd_spi_gpio_disable_irq(spi_interface);
     uint8_t buf[6];
     // MCP2517/18FD SPI transaction = command/addr, 4 bytes
     buf[0] = 0x20 | ((addr >> 8U) & 0xfU);
@@ -790,21 +794,23 @@ static mp_obj_t rp2_can_test_spi_write_word(mp_obj_t addr_obj, mp_obj_t word_obj
     // SPI transaction
     // The Pico is little-endian so the first byte sent is the lowest-address, which is the
     // same as the RP2040
-    mcp25xxfd_spi_select();
-    mcp25xxfd_spi_write(buf, sizeof(buf));
-    mcp25xxfd_spi_deselect();
-    mcp25xxfd_spi_gpio_enable_irq();
+    mcp25xxfd_spi_select(spi_interface);
+    mcp25xxfd_spi_write(spi_interface, buf, sizeof(buf));
+    mcp25xxfd_spi_deselect(spi_interface);
+    mcp25xxfd_spi_gpio_enable_irq(spi_interface);
 
     return mp_const_none;
 }
-static MP_DEFINE_CONST_FUN_OBJ_2(rp2_can_test_spi_write_word_fun_obj, rp2_can_test_spi_write_word);
+static MP_DEFINE_CONST_FUN_OBJ_3(rp2_can_test_spi_write_word_fun_obj, rp2_can_test_spi_write_word);
 static MP_DEFINE_CONST_STATICMETHOD_OBJ(rp2_can_test_spi_write_word_obj, MP_ROM_PTR(&rp2_can_test_spi_write_word_fun_obj));
 
-static mp_obj_t rp2_can_test_spi_read_word(mp_obj_t addr_obj)
+static mp_obj_t rp2_can_test_spi_read_word(mp_obj_t self_in, mp_obj_t addr_obj)
 {
+    rp2_can_obj_t *self = self_in;
+    can_interface_t *spi_interface = &self->controller.host_interface;
     uint32_t addr = mp_obj_get_int(addr_obj);
 
-    mcp25xxfd_spi_gpio_disable_irq();
+    mcp25xxfd_spi_gpio_disable_irq(spi_interface);
     uint8_t cmd[6];
     uint8_t resp[6];
 
@@ -817,21 +823,23 @@ static mp_obj_t rp2_can_test_spi_read_word(mp_obj_t addr_obj)
     cmd[5] = 0xefU;
 
     // SPI transaction
-    mcp25xxfd_spi_select();
-    mcp25xxfd_spi_read_write(cmd, resp, sizeof(cmd));
-    mcp25xxfd_spi_deselect();
+    mcp25xxfd_spi_select(spi_interface);
+    mcp25xxfd_spi_read_write(spi_interface, cmd, resp, sizeof(cmd));
+    mcp25xxfd_spi_deselect(spi_interface);
 
     uint32_t word = ((uint32_t)resp[2]) | ((uint32_t)resp[3] << 8) | ((uint32_t)resp[4] << 16) | ((uint32_t)resp[5] << 24);
-    mcp25xxfd_spi_gpio_enable_irq();
+    mcp25xxfd_spi_gpio_enable_irq(spi_interface);
 
     CAN_DEBUG_PRINT("Read word=0x%08"PRIx32"\n", word);
     return mp_obj_new_int_from_ull(word);
 }
-static MP_DEFINE_CONST_FUN_OBJ_1(rp2_can_test_spi_read_word_fun_obj, rp2_can_test_spi_read_word);
+static MP_DEFINE_CONST_FUN_OBJ_2(rp2_can_test_spi_read_word_fun_obj, rp2_can_test_spi_read_word);
 static MP_DEFINE_CONST_STATICMETHOD_OBJ(rp2_can_test_spi_read_word_obj, MP_ROM_PTR(&rp2_can_test_spi_read_word_fun_obj));
 
-static mp_obj_t rp2_can_test_spi_read_words(mp_obj_t addr_obj)
+static mp_obj_t rp2_can_test_spi_read_words(mp_obj_t self_in, mp_obj_t addr_obj)
 {
+    rp2_can_obj_t *self = self_in;
+    can_interface_t *spi_interface = &self->controller.host_interface;
     uint32_t words[4];
     uint32_t addr = mp_obj_get_int(addr_obj);
 
@@ -841,15 +849,15 @@ static mp_obj_t rp2_can_test_spi_read_words(mp_obj_t addr_obj)
     buf[0] = 0x30 | ((addr >> 8U) & 0xfU);
     buf[1] = addr & 0xffU;
 
-    mcp25xxfd_spi_gpio_disable_irq();
+    mcp25xxfd_spi_gpio_disable_irq(spi_interface);
     // SPI transaction
-    mcp25xxfd_spi_select();
+    mcp25xxfd_spi_select(spi_interface);
     // Send command, which flushes the pipeline then resumes
-    mcp25xxfd_spi_write(buf, 2U);
+    mcp25xxfd_spi_write(spi_interface, buf, 2U);
     // Bulk data
-    mcp25xxfd_spi_read((uint8_t *)(words), 16U);
-    mcp25xxfd_spi_deselect();
-    mcp25xxfd_spi_gpio_enable_irq();
+    mcp25xxfd_spi_read(spi_interface, (uint8_t *)(words), 16U);
+    mcp25xxfd_spi_deselect(spi_interface);
+    mcp25xxfd_spi_gpio_enable_irq(spi_interface);
 
     mp_obj_tuple_t *tuple = mp_obj_new_tuple(4U, NULL);
     tuple->items[0] = mp_obj_new_int_from_ull(words[0]);
@@ -859,11 +867,13 @@ static mp_obj_t rp2_can_test_spi_read_words(mp_obj_t addr_obj)
 
     return tuple;
 }
-static MP_DEFINE_CONST_FUN_OBJ_1(rp2_can_test_spi_read_words_fun_obj, rp2_can_test_spi_read_words);
+static MP_DEFINE_CONST_FUN_OBJ_2(rp2_can_test_spi_read_words_fun_obj, rp2_can_test_spi_read_words);
 static MP_DEFINE_CONST_STATICMETHOD_OBJ(rp2_can_test_spi_read_words_obj, MP_ROM_PTR(&rp2_can_test_spi_read_words_fun_obj));
 
-static mp_obj_t rp2_can_test_spi_write_words(mp_obj_t addr_obj)
+static mp_obj_t rp2_can_test_spi_write_words(mp_obj_t self_in, mp_obj_t addr_obj)
 {
+    rp2_can_obj_t *self = self_in;
+    can_interface_t *spi_interface = &self->controller.host_interface;
     uint32_t addr = mp_obj_get_int(addr_obj);
     uint32_t words[4] = {0xdeadbeefU, 0xcafef00dU, 0x01e551caU, 0x01020304U};
 
@@ -883,13 +893,13 @@ static mp_obj_t rp2_can_test_spi_write_words(mp_obj_t addr_obj)
     }
 
     // SPI transaction
-    mcp25xxfd_spi_select();
-    mcp25xxfd_spi_write(cmd, sizeof(cmd));
-    mcp25xxfd_spi_deselect();
+    mcp25xxfd_spi_select(spi_interface);
+    mcp25xxfd_spi_write(spi_interface, cmd, sizeof(cmd));
+    mcp25xxfd_spi_deselect(spi_interface);
 
     return mp_const_none;
 }
-static MP_DEFINE_CONST_FUN_OBJ_1(rp2_can_test_spi_write_words_fun_obj, rp2_can_test_spi_write_words);
+static MP_DEFINE_CONST_FUN_OBJ_2(rp2_can_test_spi_write_words_fun_obj, rp2_can_test_spi_write_words);
 static MP_DEFINE_CONST_STATICMETHOD_OBJ(rp2_can_test_spi_write_words_obj, MP_ROM_PTR(&rp2_can_test_spi_write_words_fun_obj));
 
 
@@ -897,8 +907,8 @@ static void rp2_can_print(const mp_print_t *print, mp_obj_t self_in, mp_print_ki
 {
     rp2_can_obj_t *self = self_in;
 
-    can_status_t status = can_get_status();
-    uint32_t timestamp_timer = can_get_time();
+    can_status_t status = can_get_status(&self->controller);
+    uint32_t timestamp_timer = can_get_time(&self->controller);
 
     // Show the bus off status, the error passive status, TEC, REC, the time, and the baud rate settings
     mp_printf(print, "CAN(mode=");
@@ -1010,13 +1020,15 @@ static const mp_map_elem_t rp2_can_locals_dict_table[] = {
 };
 static MP_DEFINE_CONST_DICT(rp2_can_locals_dict, rp2_can_locals_dict_table);
 
-const mp_obj_type_t rp2_can_type = {
-    { &mp_type_type },
-    .name = MP_QSTR_CAN,
-    .print = rp2_can_print,
-    .make_new = rp2_can_make_new,
-    .locals_dict = (mp_obj_t)&rp2_can_locals_dict,
-};
+MP_DEFINE_CONST_OBJ_TYPE(
+    rp2_can_type,
+    MP_QSTR_CAN,
+    MP_TYPE_FLAG_NONE,
+    print, rp2_can_print,
+    make_new, rp2_can_make_new,
+    locals_dict, (mp_obj_t)&rp2_can_locals_dict
+);
+
 ////////////////////////////////////// End of CAN class //////////////////////////////////////
 
 ////////////////////////////////// Start of CANFrame class ///////////////////////////////////
@@ -1272,13 +1284,15 @@ static const mp_map_elem_t rp2_canframe_locals_dict_table[] = {
 };
 static MP_DEFINE_CONST_DICT(rp2_canframe_locals_dict, rp2_canframe_locals_dict_table);
 
-const mp_obj_type_t rp2_canframe_type = {
-    { &mp_type_type },
-    .name = MP_QSTR_CANFrame,
-    .print = rp2_canframe_print,
-    .make_new = rp2_canframe_make_new,
-    .locals_dict = (mp_obj_t)&rp2_canframe_locals_dict,
-};
+MP_DEFINE_CONST_OBJ_TYPE(
+    rp2_canframe_type,
+    MP_QSTR_CANFrame,
+    MP_TYPE_FLAG_NONE,
+    print, rp2_canframe_print,
+    make_new, rp2_canframe_make_new,
+    locals_dict, (mp_obj_t)&rp2_canframe_locals_dict
+);
+
 ///////////////////////////////////// End of CANFrame class //////////////////////////////////////
 
 ////////////////////////////////////// Start of CANID class //////////////////////////////////////
@@ -1367,13 +1381,15 @@ static const mp_map_elem_t rp2_canid_locals_dict_table[] = {
 };
 static MP_DEFINE_CONST_DICT(rp2_canid_locals_dict, rp2_canid_locals_dict_table);
 
-const mp_obj_type_t rp2_canid_type = {
-    { &mp_type_type },
-    .name = MP_QSTR_CANID,
-    .print = rp2_canid_print,
-    .make_new = rp2_canid_make_new,
-    .locals_dict = (mp_obj_t)&rp2_canid_locals_dict,
-};
+MP_DEFINE_CONST_OBJ_TYPE(
+    rp2_canid_type,
+    MP_QSTR_CANID,
+    MP_TYPE_FLAG_NONE,
+    print, rp2_canid_print,
+    make_new, rp2_canid_make_new,
+    locals_dict, (mp_obj_t)&rp2_canid_locals_dict
+);
+
 ////////////////////////////////////// End of CANID class //////////////////////////////////////
 
 ///////////////////////////////// Start of CANIDFilter class ///////////////////////////////////
@@ -1486,13 +1502,14 @@ static const mp_map_elem_t rp2_canidfilter_locals_dict_table[] = {
 };
 static MP_DEFINE_CONST_DICT(rp2_canidfilter_locals_dict, rp2_canidfilter_locals_dict_table);
 
-const mp_obj_type_t rp2_canidfilter_type = {
-        { &mp_type_type },
-        .name = MP_QSTR_CANIDFilter,
-        .print = rp2_canidfilter_print,
-        .make_new = rp2_canidfilter_make_new,
-        .locals_dict = (mp_obj_t)&rp2_canidfilter_locals_dict,
-};
+MP_DEFINE_CONST_OBJ_TYPE(
+    rp2_canidfilter_type,
+    MP_QSTR_CANIDFilter,
+    MP_TYPE_FLAG_NONE,
+    print, rp2_canidfilter_print,
+    make_new, rp2_canidfilter_make_new,
+    locals_dict, (mp_obj_t)&rp2_canidfilter_locals_dict
+);
 
 ////////////////////////////////////// End of CANIDFilter class //////////////////////////////////////
 
@@ -1664,13 +1681,15 @@ static const mp_map_elem_t rp2_canerror_locals_dict_table[] = {
 };
 static MP_DEFINE_CONST_DICT(rp2_canerror_locals_dict, rp2_canerror_locals_dict_table);
 
-const mp_obj_type_t rp2_canerror_type = {
-        { &mp_type_type },
-        .name = MP_QSTR_CANError,
-        .print = rp2_canerror_print,
-        .make_new = rp2_canerror_make_new,
-        .locals_dict = (mp_obj_t)&rp2_canerror_locals_dict,
-};
+MP_DEFINE_CONST_OBJ_TYPE(
+    rp2_canerror_type,
+    MP_QSTR_CANError,
+    MP_TYPE_FLAG_NONE,
+    print, rp2_canerror_print,
+    make_new, rp2_canerror_make_new,
+    locals_dict, (mp_obj_t)&rp2_canerror_locals_dict
+);
+
 ////////////////////////////////////// End of CANError class //////////////////////////////////////
 
 ///////////////////////////////////// Start of CANOverflow class //////////////////////////////////
@@ -1744,13 +1763,15 @@ static const mp_map_elem_t rp2_canoverflow_locals_dict_table[] = {
 };
 static MP_DEFINE_CONST_DICT(rp2_canoverflow_locals_dict, rp2_canoverflow_locals_dict_table);
 
-const mp_obj_type_t rp2_canoverflow_type = {
-        { &mp_type_type },
-        .name = MP_QSTR_CANOverflow,
-        .print = rp2_canoverflow_print,
-        .make_new = rp2_canoverflow_make_new,
-        .locals_dict = (mp_obj_t)&rp2_canoverflow_locals_dict,
-};
+MP_DEFINE_CONST_OBJ_TYPE(
+    rp2_canoverflow_type,
+    MP_QSTR_CANOverflow,
+    MP_TYPE_FLAG_NONE,
+    print, rp2_canoverflow_print,
+    make_new, rp2_canoverflow_make_new,
+    locals_dict, (mp_obj_t)&rp2_canoverflow_locals_dict
+);
+
 ////////////////////////////////////// End of CANOverflow class ///////////////////////////////////
 
 //////////////////////////////// Start of callbacks of CANOverflow class //////////////////////////
