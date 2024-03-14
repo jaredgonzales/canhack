@@ -24,7 +24,6 @@
 #include "py/gc.h"
 #include "py/mperrno.h"
 #include "py/mphal.h"
-#include "tusb.h"
 #include "ports/rp2/canis/common.h"
 #include "rp2_min.h"
 
