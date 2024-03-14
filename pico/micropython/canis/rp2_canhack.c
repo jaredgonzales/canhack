@@ -28,15 +28,15 @@
 
 // Placeholders for code that might not run on a second core and will be shared with other code
 // that generates interrupts
-STATIC void inline disable_irq(void) {
+static void inline disable_irq(void) {
     __asm__ __volatile__ ("cpsid i");
 }
 
-STATIC void inline enable_irq(void) {
+static void inline enable_irq(void) {
     __asm__ __volatile__ ("cpsie i");
 }
 
-STATIC void inline buf_get_for_send(mp_obj_t o, mp_buffer_info_t *bufinfo, byte *tmp_data) {
+static void inline buf_get_for_send(mp_obj_t o, mp_buffer_info_t *bufinfo, byte *tmp_data) {
     if (mp_obj_is_int(o)) {
         tmp_data[0] = mp_obj_get_int(o);
         bufinfo->buf = tmp_data;
@@ -47,7 +47,7 @@ STATIC void inline buf_get_for_send(mp_obj_t o, mp_buffer_info_t *bufinfo, byte 
     }
 }
 
-STATIC uint32_t copy_mp_bytes(mp_obj_t *mp_bytes, uint8_t *dest, uint32_t max_len)
+static uint32_t copy_mp_bytes(mp_obj_t *mp_bytes, uint8_t *dest, uint32_t max_len)
 {
     if(!MP_OBJ_IS_STR_OR_BYTES(mp_bytes)) {
         nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "Bytes parameter expected"));
@@ -94,7 +94,7 @@ typedef struct _canhack_rp2_obj_t {
 
 
 // init(bit_time, sample_point)
-STATIC mp_obj_t rp2_canhack_init_helper(canhack_rp2_obj_t *self, size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
+static mp_obj_t rp2_canhack_init_helper(canhack_rp2_obj_t *self, size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
     enum { ARG_mode, ARG_extframe, ARG_prescaler, ARG_sjw, ARG_bs1, ARG_bs2, ARG_auto_restart };
     static const mp_arg_t allowed_args[] = {
             { MP_QSTR_bit_rate,     MP_ARG_KW_ONLY | MP_ARG_INT,   {.u_int  = 500} },
@@ -133,13 +133,13 @@ STATIC mp_obj_t rp2_canhack_init_helper(canhack_rp2_obj_t *self, size_t n_args, 
     return mp_const_none;
 }
 
-STATIC mp_obj_t rp2_canhack_init(size_t n_args, const mp_obj_t *args, mp_map_t *kw_args) {
+static mp_obj_t rp2_canhack_init(size_t n_args, const mp_obj_t *args, mp_map_t *kw_args) {
     return rp2_canhack_init_helper(MP_OBJ_TO_PTR(args[0]), n_args - 1, args + 1, kw_args);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_KW(rp2_canhack_init_obj, 1, rp2_canhack_init);
+static MP_DEFINE_CONST_FUN_OBJ_KW(rp2_canhack_init_obj, 1, rp2_canhack_init);
 
 // CANHack(...)
-STATIC mp_obj_t rp2_canhack_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
+static mp_obj_t rp2_canhack_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     mp_arg_check_num(n_args, n_kw, 0, MP_OBJ_FUN_ARGS_MAX, true);
 
     canhack_rp2_obj_t *self = m_new_obj(canhack_rp2_obj_t);
@@ -155,13 +155,13 @@ STATIC mp_obj_t rp2_canhack_make_new(const mp_obj_type_t *type, size_t n_args, s
 }
 
 // Trivial function to stop the current attack (only useful in a multi-threaded environment
-STATIC mp_obj_t rp2_canhack_stop(size_t n_args, const mp_obj_t *args, mp_map_t *kw_args) {
+static mp_obj_t rp2_canhack_stop(size_t n_args, const mp_obj_t *args, mp_map_t *kw_args) {
     canhack_stop();
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_KW(rp2_canhack_stop_obj, 1, rp2_canhack_stop);
+static MP_DEFINE_CONST_FUN_OBJ_KW(rp2_canhack_stop_obj, 1, rp2_canhack_stop);
 
-STATIC mp_obj_t rp2_canhack_set_frame(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
+static mp_obj_t rp2_canhack_set_frame(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
 {
     static const mp_arg_t allowed_args[] = {
             { MP_QSTR_can_id,    MP_ARG_REQUIRED | MP_ARG_INT, {.u_int = 0x7ff} },
@@ -233,7 +233,7 @@ STATIC mp_obj_t rp2_canhack_set_frame(mp_uint_t n_args, const mp_obj_t *pos_args
 
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_KW(rp2_canhack_set_frame_obj, 1, rp2_canhack_set_frame);
+static MP_DEFINE_CONST_FUN_OBJ_KW(rp2_canhack_set_frame_obj, 1, rp2_canhack_set_frame);
 
 #define ANSI_COLOR_RED     "\x1b[31m"
 #define ANSI_COLOR_GREEN   "\x1b[32m"
@@ -244,7 +244,7 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_KW(rp2_canhack_set_frame_obj, 1, rp2_canhack_set_
 #define ANSI_COLOR_RESET   "\x1b[0m"
 
 // Simple function to create Micropython bytes from a block of memory
-STATIC mp_obj_t make_mp_bytes(const uint8_t *src, uint32_t len)
+static mp_obj_t make_mp_bytes(const uint8_t *src, uint32_t len)
 {
     vstr_t vstr;
     vstr_init_len(&vstr, len);
@@ -255,7 +255,7 @@ STATIC mp_obj_t make_mp_bytes(const uint8_t *src, uint32_t len)
     return mp_obj_new_str_from_vstr(&vstr);
 }
 
-STATIC mp_obj_t rp2_canhack_get_frame(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
+static mp_obj_t rp2_canhack_get_frame(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
 {
     static const mp_arg_t allowed_args[] = {
             { MP_QSTR_second,           MP_ARG_KW_ONLY  | MP_ARG_BOOL,  {.u_bool = false} },
@@ -302,9 +302,9 @@ STATIC mp_obj_t rp2_canhack_get_frame(mp_uint_t n_args, const mp_obj_t *pos_args
 
     return tuple;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_KW(rp2_canhack_get_frame_obj, 1, rp2_canhack_get_frame);
+static MP_DEFINE_CONST_FUN_OBJ_KW(rp2_canhack_get_frame_obj, 1, rp2_canhack_get_frame);
 
-STATIC mp_obj_t rp2_canhack_print_frame(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
+static mp_obj_t rp2_canhack_print_frame(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
 {
     static const mp_arg_t allowed_args[] = {
             { MP_QSTR_stuff_bits,           MP_ARG_KW_ONLY  | MP_ARG_BOOL,  {.u_bool = true} },
@@ -356,9 +356,9 @@ STATIC mp_obj_t rp2_canhack_print_frame(mp_uint_t n_args, const mp_obj_t *pos_ar
 
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_KW(rp2_canhack_print_frame_obj, 1, rp2_canhack_print_frame);
+static MP_DEFINE_CONST_FUN_OBJ_KW(rp2_canhack_print_frame_obj, 1, rp2_canhack_print_frame);
 
-STATIC mp_obj_t rp2_canhack_send_frame(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
+static mp_obj_t rp2_canhack_send_frame(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
 {
     static const mp_arg_t allowed_args[] = {
             { MP_QSTR_timeout,           MP_ARG_KW_ONLY  | MP_ARG_INT,  {.u_int = 50000000U} },
@@ -402,9 +402,9 @@ STATIC mp_obj_t rp2_canhack_send_frame(mp_uint_t n_args, const mp_obj_t *pos_arg
 
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_KW(rp2_canhack_send_frame_obj, 1, rp2_canhack_send_frame);
+static MP_DEFINE_CONST_FUN_OBJ_KW(rp2_canhack_send_frame_obj, 1, rp2_canhack_send_frame);
 
-STATIC mp_obj_t rp2_canhack_send_janus_frame(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
+static mp_obj_t rp2_canhack_send_janus_frame(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
 {
     static const mp_arg_t allowed_args[] = {
             { MP_QSTR_sync_time,         MP_ARG_KW_ONLY  | MP_ARG_INT,  {.u_int = 50} },
@@ -440,9 +440,9 @@ STATIC mp_obj_t rp2_canhack_send_janus_frame(mp_uint_t n_args, const mp_obj_t *p
 
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_KW(rp2_canhack_send_janus_frame_obj, 1, rp2_canhack_send_janus_frame);
+static MP_DEFINE_CONST_FUN_OBJ_KW(rp2_canhack_send_janus_frame_obj, 1, rp2_canhack_send_janus_frame);
 
-STATIC mp_obj_t rp2_canhack_spoof_frame(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
+static mp_obj_t rp2_canhack_spoof_frame(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
 {
     static const mp_arg_t allowed_args[] = {
             { MP_QSTR_timeout,           MP_ARG_KW_ONLY  | MP_ARG_INT,  {.u_int = 50000000U} },
@@ -504,9 +504,9 @@ STATIC mp_obj_t rp2_canhack_spoof_frame(mp_uint_t n_args, const mp_obj_t *pos_ar
 
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_KW(rp2_canhack_spoof_frame_obj, 1, rp2_canhack_spoof_frame);
+static MP_DEFINE_CONST_FUN_OBJ_KW(rp2_canhack_spoof_frame_obj, 1, rp2_canhack_spoof_frame);
 
-STATIC mp_obj_t rp2_canhack_error_attack(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
+static mp_obj_t rp2_canhack_error_attack(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
 {
     static const mp_arg_t allowed_args[] = {
             { MP_QSTR_repeat,           MP_ARG_KW_ONLY  | MP_ARG_INT,  {.u_int = 2U} },
@@ -535,9 +535,9 @@ STATIC mp_obj_t rp2_canhack_error_attack(mp_uint_t n_args, const mp_obj_t *pos_a
 
     return timeout_occurred ? mp_const_true : mp_const_false;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_KW(rp2_canhack_error_attack_obj, 1, rp2_canhack_error_attack);
+static MP_DEFINE_CONST_FUN_OBJ_KW(rp2_canhack_error_attack_obj, 1, rp2_canhack_error_attack);
 
-STATIC mp_obj_t rp2_canhack_double_receive_attack(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
+static mp_obj_t rp2_canhack_double_receive_attack(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
 {
     static const mp_arg_t allowed_args[] = {
             { MP_QSTR_repeat,           MP_ARG_KW_ONLY  | MP_ARG_INT,  {.u_int = 2U} },
@@ -568,9 +568,9 @@ STATIC mp_obj_t rp2_canhack_double_receive_attack(mp_uint_t n_args, const mp_obj
 
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_KW(rp2_canhack_double_receive_attack_obj, 1, rp2_canhack_double_receive_attack);
+static MP_DEFINE_CONST_FUN_OBJ_KW(rp2_canhack_double_receive_attack_obj, 1, rp2_canhack_double_receive_attack);
 
-STATIC mp_obj_t rp2_canhack_freeze_doom_loop_attack(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
+static mp_obj_t rp2_canhack_freeze_doom_loop_attack(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
 {
     static const mp_arg_t allowed_args[] = {
             { MP_QSTR_repeat,           MP_ARG_KW_ONLY  | MP_ARG_INT,  {.u_int = 2U} },
@@ -599,9 +599,9 @@ STATIC mp_obj_t rp2_canhack_freeze_doom_loop_attack(mp_uint_t n_args, const mp_o
 
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_KW(rp2_canhack_freeze_doom_loop_attack_obj, 1, rp2_canhack_freeze_doom_loop_attack);
+static MP_DEFINE_CONST_FUN_OBJ_KW(rp2_canhack_freeze_doom_loop_attack_obj, 1, rp2_canhack_freeze_doom_loop_attack);
 
-STATIC mp_obj_t rp2_canhack_set_can_tx(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
+static mp_obj_t rp2_canhack_set_can_tx(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
 {
     static const mp_arg_t allowed_args[] = {
             { MP_QSTR_recessive,           MP_ARG_KW_ONLY  | MP_ARG_BOOL,  {.u_int = true} },
@@ -624,40 +624,40 @@ STATIC mp_obj_t rp2_canhack_set_can_tx(mp_uint_t n_args, const mp_obj_t *pos_arg
         return mp_const_false;
     }
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_KW(rp2_canhack_set_can_tx_obj, 1, rp2_canhack_set_can_tx);
+static MP_DEFINE_CONST_FUN_OBJ_KW(rp2_canhack_set_can_tx_obj, 1, rp2_canhack_set_can_tx);
 
 
-STATIC mp_obj_t rp2_canhack_square_wave(mp_obj_t self_in)
+static mp_obj_t rp2_canhack_square_wave(mp_obj_t self_in)
 {
     canhack_send_square_wave();
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_canhack_square_wave_obj, rp2_canhack_square_wave);
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_canhack_square_wave_obj, rp2_canhack_square_wave);
 
 
-STATIC mp_obj_t rp2_canhack_loopback(mp_obj_t self_in)
+static mp_obj_t rp2_canhack_loopback(mp_obj_t self_in)
 {
     canhack_loopback();
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_canhack_loopback_obj, rp2_canhack_loopback);
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_canhack_loopback_obj, rp2_canhack_loopback);
 
 
-STATIC mp_obj_t rp2_canhack_get_clock(mp_obj_t self_in)
+static mp_obj_t rp2_canhack_get_clock(mp_obj_t self_in)
 {
     return mp_obj_new_int(GET_CLOCK());
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_canhack_get_clock_obj, rp2_canhack_get_clock);
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_canhack_get_clock_obj, rp2_canhack_get_clock);
 
 
-STATIC mp_obj_t rp2_canhack_reset_clock(mp_obj_t self_in)
+static mp_obj_t rp2_canhack_reset_clock(mp_obj_t self_in)
 {
     ctr_t c = GET_CLOCK();
     RESET_CLOCK(0);
 
     return mp_obj_new_int(c);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_canhack_reset_clock_obj, rp2_canhack_reset_clock);
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_canhack_reset_clock_obj, rp2_canhack_reset_clock);
 
 ctr_t ts[160];
 
@@ -689,7 +689,7 @@ __attribute__((noinline, long_call, section(".time_critical"))) void send_raw_fr
     }
 }
 
-STATIC mp_obj_t rp2_canhack_send_raw(mp_obj_t self_in)
+static mp_obj_t rp2_canhack_send_raw(mp_obj_t self_in)
 {
     canhack_frame_t *frame = canhack_get_frame(false);
     if (!frame->frame_set) {
@@ -708,10 +708,10 @@ STATIC mp_obj_t rp2_canhack_send_raw(mp_obj_t self_in)
 
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_canhack_send_raw_obj, rp2_canhack_send_raw);
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_canhack_send_raw_obj, rp2_canhack_send_raw);
 
 
-STATIC const mp_map_elem_t rp2_canhack_locals_dict_table[] = {
+static const mp_map_elem_t rp2_canhack_locals_dict_table[] = {
         // instance methods
         { MP_OBJ_NEW_QSTR(MP_QSTR_init), (mp_obj_t)&rp2_canhack_init_obj },
         { MP_OBJ_NEW_QSTR(MP_QSTR_stop), (mp_obj_t)&rp2_canhack_stop_obj },
@@ -731,9 +731,9 @@ STATIC const mp_map_elem_t rp2_canhack_locals_dict_table[] = {
         { MP_OBJ_NEW_QSTR(MP_QSTR_reset_clock), (mp_obj_t)&rp2_canhack_reset_clock_obj },
         { MP_OBJ_NEW_QSTR(MP_QSTR_send_raw), (mp_obj_t)&rp2_canhack_send_raw_obj },
 };
-STATIC MP_DEFINE_CONST_DICT(rp2_canhack_locals_dict, rp2_canhack_locals_dict_table);
+static MP_DEFINE_CONST_DICT(rp2_canhack_locals_dict, rp2_canhack_locals_dict_table);
 
-STATIC void rp2_canhack_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind)
+static void rp2_canhack_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind)
 {
     canhack_rp2_obj_t *self = self_in;
 
@@ -747,16 +747,18 @@ mp_uint_t canhack_ioctl(mp_obj_t self_in, mp_uint_t request, uintptr_t arg, int 
     return -1;
 }
 
-STATIC const mp_stream_p_t canhack_stream_p = {
+static const mp_stream_p_t canhack_stream_p = {
         .ioctl = canhack_ioctl,
         .is_text = false,
 };
 
-const mp_obj_type_t rp2_canhack_type = {
-        { &mp_type_type },
-        .name = MP_QSTR_CANHack,
-        .print = rp2_canhack_print,
-        .make_new = rp2_canhack_make_new,
-        .protocol = &canhack_stream_p,
-        .locals_dict = (mp_obj_t)&rp2_canhack_locals_dict,
-};
+
+MP_DEFINE_CONST_OBJ_TYPE(
+    rp2_canhack_type,
+    MP_QSTR_CANHack,
+    MP_TYPE_FLAG_NONE,
+    make_new, rp2_canhack_make_new,
+    print, rp2_canhack_print,
+    protocol, &canhack_stream_p,
+    locals_dict, &rp2_canhack_locals_dict
+    );
