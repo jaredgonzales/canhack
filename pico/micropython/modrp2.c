@@ -47,8 +47,6 @@
 #include <canis/rp2_cryptocan.h>
 #endif
 
-#include <canis/rp2_min.h>
-
 #if MICROPY_PY_NETWORK_CYW43
 MP_DECLARE_CONST_FUN_OBJ_VAR_BETWEEN(mod_network_country_obj);
 #endif
@@ -116,7 +114,6 @@ static const mp_rom_map_elem_t rp2_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_CANError),            MP_ROM_PTR(&rp2_canerror_type) },
     { MP_ROM_QSTR(MP_QSTR_CANOverflow),         MP_ROM_PTR(&rp2_canoverflow_type) },
     #endif
-    { MP_ROM_QSTR(MP_QSTR_MIN),                 MP_ROM_PTR(&rp2_min_type) },
     #ifdef CRYPTOCAN
     { MP_ROM_QSTR(MP_QSTR_CryptoCAN),           MP_ROM_PTR(&rp2_cryptocan_type) },
     { MP_ROM_QSTR(MP_QSTR_HSM),                 MP_ROM_PTR(&rp2_hsm_type) },

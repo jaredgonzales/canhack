@@ -52,7 +52,6 @@
 #include "pico/unique_id.h"
 #include "hardware/rtc.h"
 #include "hardware/structs/rosc.h"
-#include "canis/rp2_min.h"
 #if MICROPY_PY_LWIP
 #include "lwip/init.h"
 #include "lwip/apps/mdns.h"
@@ -178,8 +177,6 @@ int main(int argc, char **argv) {
         #ifdef CAN
         can_init();
         #endif
-        // TODO make MIN conditionally included        
-        min_init();
         #ifdef CRYPTOCAN
         hsm_init();
         #endif
@@ -238,8 +235,6 @@ int main(int argc, char **argv) {
         #ifdef CAN
         can_deinit();
         #endif
-        // TODO make MIN conditionally included
-        min_deinit();
         #ifdef CRYPTOCAN
         hsm_deinit();
         #endif
