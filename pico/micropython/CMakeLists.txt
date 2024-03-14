@@ -168,8 +168,8 @@ set(MICROPY_SOURCE_QSTR
     ${PROJECT_SOURCE_DIR}/machine_wdt.c
     ${PROJECT_SOURCE_DIR}/modmachine.c
     ${PROJECT_SOURCE_DIR}/modrp2.c
-    ${PROJECT_SOURCE_DIR}/moduos.c
-    ${PROJECT_SOURCE_DIR}/modutime.c
+    ${PROJECT_SOURCE_DIR}/modos.c
+    ${PROJECT_SOURCE_DIR}/modtime.c
     ${PROJECT_SOURCE_DIR}/rp2_flash.c
     ${PROJECT_SOURCE_DIR}/rp2_pio.c
     ${PROJECT_SOURCE_DIR}/canis/rp2_min.c  # TODO make this conditionally included
@@ -362,7 +362,7 @@ endif()
 if (CAN OR CRYPTOCAN)
     target_compile_definitions(${MICROPY_TARGET} PRIVATE
         CAN=1
-        MCP2517FD=1
+        MCP25xxFD=1
         HOST_CANPICO=1
     )
 endif()
