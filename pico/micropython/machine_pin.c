@@ -97,6 +97,7 @@ extern const machine_pin_obj_t machine_pin_obj_table[NUM_BANK0_GPIOS];
 
 #ifdef CAN
 #include "canapi.h"
+static can_controller_t controller;
 #endif
 
 // Mask with "1" indicating that the corresponding pin is in simulated open-drain mode.
@@ -129,7 +130,15 @@ static void gpio_irq(void) {
         // that made the CAN() constructor call. The event for this interrupt and the core is fixed so there is no
         // need to do any checking, and instead if the SPI_IRQ pin has caused the IRQ then it is handled
         // by this core.
-        mcp25xxfd_irq_handler();
+
+        // Work out if this interrupt is from the the MCP25xxFD. The bound interface
+        // defines the pin used for the interrupt line from the CAN controller.
+        uint8_t spi_irq = controller.host_interface.spi_irq;
+        uint32_t events = gpio_get_irq_event_mask(spi_irq); 
+
+        if (events & GPIO_IRQ_LEVEL_LOW) {
+            mcp25xxfd_irq_handler(&controller);
+        }
     }
 
     // This GPIO vector is shared, and needs to be of high priority to service the MCP2518. But
