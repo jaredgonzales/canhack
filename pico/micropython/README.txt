@@ -34,28 +34,21 @@ $ cd micropython
 $ git checkout v1.22-release
 $ git submodule update --init
 
-2. Add MIN
-----------
-
-$ cd lib
-$ git clone https://github.com/min-protocol/min.git
-$ cd ..
-
-3. Build mpy-cross
+2. Build mpy-cross
 ------------------
 
 $ cd mpy-cross
 $ make
 $ cd ..
 
-4. Check this has worked by making the stock Pico firmware
+3. Check this has worked by making the stock Pico firmware
 ----------------------------------------------------------
 
 $ cd ports/rp2/
 $ cmake CMakeLists.txt
 $ make
 
-6. Patch the firmware
+4. Patch the firmware
 ---------------------
 
 Copy the file hierarchy in this directory to ports/rp2 in the MicroPython build:
@@ -63,8 +56,6 @@ Copy the file hierarchy in this directory to ports/rp2 in the MicroPython build:
 CMakeLists.txt 
 machine_pin.c
 modrp2.c
-tusb_config.h
-tusb_port.c
 main.c
 mpconfigport.h
 canis/
@@ -72,8 +63,6 @@ canis/
     canhack.c
     common.h
     common.c
-    rp2_min.h
-    rp2_min.c
     rp2_can.h
     rp2_can.c
     rp2_canhack.h
@@ -103,10 +92,6 @@ in the normal way:
 - Wait until the board mounts as a removable disk
 - Copy the firmware into the disk
 - Power off the board and power it on again
-
-The board should appear as a USB serial device with two serial ports. On Linux machines, these
-will be /dev/ttyACM0 and /dev/ttyACM1, with REPL running on /dev/ttyACM0 (the second serial port
-is for MIN to allow automation from a host).
 
 Check the board is running by connecting to the serial port. On Linux the rshell tool is useful
 (https://github.com/dhylands/rshell).
