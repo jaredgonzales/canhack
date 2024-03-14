@@ -73,5 +73,5 @@ mp_obj_t make_mp_bytes(const uint8_t *src, uint32_t len)
         vstr.buf[i] = src[i];
     }
 
-    return mp_obj_new_str_from_vstr(&mp_type_bytes, &vstr);
+    return mp_obj_new_str_from_vstr(&vstr);
 }

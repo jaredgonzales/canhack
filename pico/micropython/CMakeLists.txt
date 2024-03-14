@@ -121,10 +121,6 @@ set(CRYPTOCAN_SOURCE_LIB
     ${CC_CRYPTOCAN_PATH}/rx.c
 )
 
-set(MIN_SOURCE_LIB
-    ${MICROPY_DIR}/lib/min/target/min.c
-)
-
 set(MICROPY_SOURCE_LIB
     ${MICROPY_DIR}/lib/littlefs/lfs1.c
     ${MICROPY_DIR}/lib/littlefs/lfs1_util.c
@@ -174,12 +170,10 @@ set(MICROPY_SOURCE_PORT
     rp2_flash.c
     rp2_pio.c
     rp2_dma.c
-    tusb_port.c
     uart.c
     usbd.c
     msc_disk.c
     canis/common.c
-    canis/rp2_min.c
     mbedtls/mbedtls_port.c
     ${CMAKE_BINARY_DIR}/pins_${MICROPY_BOARD}.c
 )
@@ -204,7 +198,6 @@ set(MICROPY_SOURCE_QSTR
     ${MICROPY_PORT_DIR}/rp2_dma.c
     ${PROJECT_SOURCE_DIR}/rp2_flash.c
     ${PROJECT_SOURCE_DIR}/rp2_pio.c
-    ${PROJECT_SOURCE_DIR}/canis/rp2_min.c  # TODO make this conditionally included
     ${CMAKE_BINARY_DIR}/pins_${MICROPY_BOARD}.c
 )
 
@@ -500,7 +493,6 @@ target_sources(${MICROPY_TARGET} PRIVATE
     ${MICROPY_SOURCE_LIB}
     ${MICROPY_SOURCE_DRIVERS}
     ${MICROPY_SOURCE_PORT}
-    ${MIN_SOURCE_LIB}
 )
 
 target_link_libraries(${MICROPY_TARGET} micropy_lib_mbedtls)
