@@ -67,10 +67,11 @@ void can_init(void) {
 
 void can_deinit(void) {
     // Called when the system is soft reset (CTRL-D in REPL).
+    rp2_can_obj_t *self = MP_STATE_PORT(rp2_can_obj);
 
     // If the controller is initialized then take it offline and deactivate it
     if (MP_STATE_PORT(rp2_can_obj) != NULL) {
-        can_stop_controller();
+        can_stop_controller(&self->controller);
     }
     MP_STATE_PORT(rp2_can_obj) = NULL;
 }
@@ -82,7 +83,7 @@ void can_deinit(void) {
 ////////////////////////////////////// Start of CAN class //////////////////////////////////////
 
 // Create the CAN instance and initialize the controller
-STATIC mp_obj_t rp2_can_make_new(const mp_obj_type_t *type, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *all_args)
+static mp_obj_t rp2_can_make_new(const mp_obj_type_t *type, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *all_args)
 {
     static const mp_arg_t allowed_args[] = {
         {MP_QSTR_profile,           MP_ARG_KW_ONLY | MP_ARG_INT,    {.u_int  = 0}},
@@ -212,15 +213,14 @@ STATIC mp_obj_t rp2_can_make_new(const mp_obj_type_t *type, mp_uint_t n_args, mp
     return self;
 }
 
-STATIC mp_obj_t rp2_can_send_frame(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
+static mp_obj_t rp2_can_send_frame(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
 {
     static const mp_arg_t allowed_args[] = {
         {MP_QSTR_frame,    MP_ARG_REQUIRED | MP_ARG_OBJ, {.u_obj = MP_OBJ_NULL}},
         {MP_QSTR_fifo,     MP_ARG_KW_ONLY | MP_ARG_BOOL, {.u_bool = false}},
     };
 
-    // Not used
-    // rp2_can_obj_t *self = pos_args[0];
+    rp2_can_obj_t *self = pos_args[0];
     mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all(n_args - 1, pos_args + 1, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
 
@@ -232,7 +232,7 @@ STATIC mp_obj_t rp2_can_send_frame(mp_uint_t n_args, const mp_obj_t *pos_args, m
     }
 
     // C API call
-    can_errorcode_t rc = can_send_frame(&mp_frame->frame, fifo);
+    can_errorcode_t rc = can_send_frame(&self->controller, &mp_frame->frame, fifo);
 
     if (rc == CAN_ERC_NO_ROOM_FIFO) {
         nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError, "No room in FIFO queue"));
@@ -245,17 +245,16 @@ STATIC mp_obj_t rp2_can_send_frame(mp_uint_t n_args, const mp_obj_t *pos_args, m
     }
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_KW(rp2_can_send_frame_obj, 1, rp2_can_send_frame);
+static MP_DEFINE_CONST_FUN_OBJ_KW(rp2_can_send_frame_obj, 1, rp2_can_send_frame);
 
-STATIC mp_obj_t rp2_can_send_frames(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
+static mp_obj_t rp2_can_send_frames(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
 {
     static const mp_arg_t allowed_args[] = {
         {MP_QSTR_frames,   MP_ARG_REQUIRED | MP_ARG_OBJ, {.u_obj = MP_OBJ_NULL}},
         {MP_QSTR_fifo,     MP_ARG_KW_ONLY | MP_ARG_BOOL, {.u_bool = false}},
     };
 
-    // Not used
-    // rp2_can_obj_t *self = pos_args[0];
+    rp2_can_obj_t *self = pos_args[0];
     mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all(n_args - 1, pos_args + 1, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
 
@@ -273,10 +272,10 @@ STATIC mp_obj_t rp2_can_send_frames(mp_uint_t n_args, const mp_obj_t *pos_args, 
         }
     }
 
-    if (can_is_space(frames->len, fifo)) {
+    if (can_is_space(&self->controller, frames->len, fifo)) {
         for (uint32_t i = 0; i < frames->len; i++) {
             rp2_canframe_obj_t *mp_frame = frames->items[i];
-            can_send_frame(&mp_frame->frame, fifo);
+            can_send_frame(&self->controller, &mp_frame->frame, fifo);
         }
     }
     else {
@@ -285,17 +284,16 @@ STATIC mp_obj_t rp2_can_send_frames(mp_uint_t n_args, const mp_obj_t *pos_args, 
 
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_KW(rp2_can_send_frames_obj, 1, rp2_can_send_frames);
+static MP_DEFINE_CONST_FUN_OBJ_KW(rp2_can_send_frames_obj, 1, rp2_can_send_frames);
 
-STATIC mp_obj_t rp2_can_recv(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
+static mp_obj_t rp2_can_recv(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
 {
     static const mp_arg_t allowed_args[] = {
         {MP_QSTR_limit,         MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = CAN_RX_FIFO_SIZE}},
         {MP_QSTR_as_bytes,      MP_ARG_KW_ONLY | MP_ARG_BOOL, {.u_bool = false}},
     };
 
-    // Not used
-    // rp2_can_obj_t *self = pos_args[0];
+    rp2_can_obj_t *self = pos_args[0];
     mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all(n_args - 1, pos_args + 1, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
 
@@ -304,7 +302,7 @@ STATIC mp_obj_t rp2_can_recv(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_
     uint32_t limit = args[0].u_int;
     bool as_bytes = args[1].u_bool;
 
-    uint32_t num_events = can_recv_pending();
+    uint32_t num_events = can_recv_pending(&self->controller);
     if (limit > num_events) {
         limit = num_events;
     }
@@ -319,7 +317,7 @@ STATIC mp_obj_t rp2_can_recv(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_
         // Pull frames from the FIFO up to a limit, keeping track of the bytes added so that if
         // there aren't enough bytes then that's the number returned
         for (uint32_t i = 0; i < limit; i++) {
-            size_t added = can_recv_as_bytes(buf + n, remaining);
+            size_t added = can_recv_as_bytes(&self->controller, buf + n, remaining);
             if (added > 0) {
                 n += added;
                 remaining -= added;
@@ -340,7 +338,7 @@ STATIC mp_obj_t rp2_can_recv(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_
         for (uint32_t i = 0; i < limit; i++) {
             can_rx_event_t event;
             can_rx_event_t *ev = &event;
-            if (can_recv(ev)) {
+            if (can_recv(&self->controller, ev)) {
                 if (can_event_is_frame(ev)) {
                     rp2_canframe_obj_t *mp_frame = m_new_obj(rp2_canframe_obj_t);
                     mp_frame->base.type = &rp2_canframe_type;
@@ -375,7 +373,7 @@ STATIC mp_obj_t rp2_can_recv(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_
         return list;
     }
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_KW(rp2_can_recv_obj, 1, rp2_can_recv);
+static MP_DEFINE_CONST_FUN_OBJ_KW(rp2_can_recv_obj, 1, rp2_can_recv);
 
 #if _BullseyeCoverage
 // TODO allocate this on the heap?
@@ -391,31 +389,29 @@ long cov_memoryAreaSize = 4096;
 #endif
 
 // Return number of messages waiting in the RX FIFO.`
-STATIC mp_obj_t rp2_can_recv_pending(mp_obj_t self_in)
+static mp_obj_t rp2_can_recv_pending(mp_obj_t self_in)
 {
-    // Not used
-    // rp2_can_obj_t *self = self_in;
+    rp2_can_obj_t *self = self_in;
 
-    return MP_OBJ_NEW_SMALL_INT(can_recv_pending());
+    return MP_OBJ_NEW_SMALL_INT(can_recv_pending(&self->controller));
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_can_recv_pending_obj, rp2_can_recv_pending);
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_can_recv_pending_obj, rp2_can_recv_pending);
 
-STATIC mp_obj_t rp2_can_recv_tx_events(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
+static mp_obj_t rp2_can_recv_tx_events(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
 {
     static const mp_arg_t allowed_args[] = {
             {MP_QSTR_limit,    MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = CAN_TX_EVENT_FIFO_SIZE}},
             {MP_QSTR_as_bytes, MP_ARG_KW_ONLY | MP_ARG_BOOL, {.u_bool = false}},
     };
 
-    // Not used
-    // rp2_can_obj_t *self = pos_args[0];
+    rp2_can_obj_t *self = pos_args[0];
     mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all(n_args - 1, pos_args + 1, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
 
     uint32_t limit = args[0].u_int;
     bool as_bytes = args[1].u_bool;
 
-    uint32_t num_events = can_recv_tx_events_pending();
+    uint32_t num_events = can_recv_tx_events_pending(&self->controller);
 
     if (limit > num_events) {
         limit = num_events;
@@ -428,7 +424,7 @@ STATIC mp_obj_t rp2_can_recv_tx_events(mp_uint_t n_args, const mp_obj_t *pos_arg
 
         // Pull events from the FIFO up to a limit
         for (uint32_t i = 0; i < limit; i++) {
-            size_t added = can_recv_tx_event_as_bytes(buf + n, remaining);
+            size_t added = can_recv_tx_event_as_bytes(&self->controller, buf + n, remaining);
             if (added) {
                 n += added;
                 remaining -= added;
@@ -450,7 +446,7 @@ STATIC mp_obj_t rp2_can_recv_tx_events(mp_uint_t n_args, const mp_obj_t *pos_arg
             can_tx_event_t event;
             can_tx_event_t *e = &event;
             
-            bool recvd = can_recv_tx_event(e);
+            bool recvd = can_recv_tx_event(&self->controller, e);
             if (recvd) {
                 if (can_tx_event_is_frame(e)) {
                     // Return a reference to the instance of the transmitted frame (that should not have been garbage collected
@@ -478,24 +474,22 @@ STATIC mp_obj_t rp2_can_recv_tx_events(mp_uint_t n_args, const mp_obj_t *pos_arg
         return list;
     }
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_KW(rp2_can_recv_tx_events_obj, 1, rp2_can_recv_tx_events);
+static MP_DEFINE_CONST_FUN_OBJ_KW(rp2_can_recv_tx_events_obj, 1, rp2_can_recv_tx_events);
 
 // Return number of events waiting in the TX event FIFO.`
-STATIC mp_obj_t rp2_can_recv_tx_events_pending(mp_obj_t self_in)
+static mp_obj_t rp2_can_recv_tx_events_pending(mp_obj_t self_in)
 {
-    // Not used
-    // rp2_can_obj_t *self = self_in;
+    rp2_can_obj_t *self = self_in;
 
-    return MP_OBJ_NEW_SMALL_INT(can_recv_tx_events_pending());
+    return MP_OBJ_NEW_SMALL_INT(can_recv_tx_events_pending(&self->controller));
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_can_recv_tx_events_pending_obj, rp2_can_recv_tx_events_pending);
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_can_recv_tx_events_pending_obj, rp2_can_recv_tx_events_pending);
 
 // Return number of messages waiting in the RX FIFO.
-STATIC mp_obj_t rp2_can_get_status(mp_obj_t self_in)
+static mp_obj_t rp2_can_get_status(mp_obj_t self_in)
 {
-    // Not used
-    // rp2_can_obj_t *self = self_in;
-    can_status_t status = can_get_status();
+    rp2_can_obj_t *self = self_in;
+    can_status_t status = can_get_status(&self->controller);
 
     // Returns a tuple of:
     // bool: is Bus-off
@@ -510,10 +504,10 @@ STATIC mp_obj_t rp2_can_get_status(mp_obj_t self_in)
 
     return tuple;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_can_get_status_obj, rp2_can_get_status);
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_can_get_status_obj, rp2_can_get_status);
 
 // Return diagnostic values
-STATIC mp_obj_t rp2_can_get_diagnostics(mp_obj_t self_in)
+static mp_obj_t rp2_can_get_diagnostics(mp_obj_t self_in)
 {
     rp2_can_obj_t *self = self_in;
     // Returns a tuple of:
@@ -532,50 +526,48 @@ STATIC mp_obj_t rp2_can_get_diagnostics(mp_obj_t self_in)
 
     return tuple;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_can_get_diagnostics_obj, rp2_can_get_diagnostics);
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_can_get_diagnostics_obj, rp2_can_get_diagnostics);
 
 // Return the timestamp counter (Typically used to convert timestamps to time-of-day)
-STATIC mp_obj_t rp2_can_get_time(mp_obj_t self_in)
+static mp_obj_t rp2_can_get_time(mp_obj_t self_in)
 {
-    // Not used
-    // rp2_can_obj_t *self = self_in;
+    rp2_can_obj_t *self = self_in;
 
-    return mp_obj_new_int_from_uint(can_get_time());
+    return mp_obj_new_int_from_uint(can_get_time(&self->controller));
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_can_get_time_obj, rp2_can_get_time);
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_can_get_time_obj, rp2_can_get_time);
 
 // Return the timestamp counter resolution in ticks per second (the CAN drivers
 // set the timer to tick at 1us)
-STATIC mp_obj_t rp2_can_get_time_hz(mp_obj_t self_in)
+static mp_obj_t rp2_can_get_time_hz(mp_obj_t self_in)
 {
     // Not used
     // rp2_can_obj_t *self = self_in;
 
     return mp_obj_new_int_from_uint(1000000U);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_can_get_time_hz_obj, rp2_can_get_time_hz);
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_can_get_time_hz_obj, rp2_can_get_time_hz);
 
 // Return number of frame slots free in the transmit or FIFO queues
-STATIC mp_obj_t rp2_can_get_send_space(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
+static mp_obj_t rp2_can_get_send_space(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
 {
     static const mp_arg_t allowed_args[] = {
         {MP_QSTR_fifo,    MP_ARG_KW_ONLY | MP_ARG_BOOL, {.u_bool = false}},
     };
 
-    // Not used
-    // rp2_can_obj_t *self = pos_args[0];
+    rp2_can_obj_t *self = pos_args[0];
 
     mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all(n_args - 1, pos_args + 1, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
 
     bool fifo = args[0].u_bool;
 
-    return MP_OBJ_NEW_SMALL_INT(can_get_send_space(fifo));
+    return MP_OBJ_NEW_SMALL_INT(can_get_send_space(&self->controller, fifo));
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_KW(rp2_can_get_send_space_obj, 1, rp2_can_get_send_space);
+static MP_DEFINE_CONST_FUN_OBJ_KW(rp2_can_get_send_space_obj, 1, rp2_can_get_send_space);
 
 // Set the conditions for triggering an edge on the trigger pin
-STATIC mp_obj_t rp2_can_set_trigger(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
+static mp_obj_t rp2_can_set_trigger(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
 {
     static const mp_arg_t allowed_args[] = {
             {MP_QSTR_on_error,      MP_ARG_KW_ONLY | MP_ARG_BOOL, {.u_bool = false}},
@@ -667,10 +659,10 @@ STATIC mp_obj_t rp2_can_set_trigger(mp_uint_t n_args, const mp_obj_t *pos_args, 
     
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_KW(rp2_can_set_trigger_obj, 1, rp2_can_set_trigger);
+static MP_DEFINE_CONST_FUN_OBJ_KW(rp2_can_set_trigger_obj, 1, rp2_can_set_trigger);
 
 // Clear the trigger from operating
-STATIC mp_obj_t rp2_can_clear_trigger(mp_obj_t self_in)
+static mp_obj_t rp2_can_clear_trigger(mp_obj_t self_in)
 {
     rp2_can_obj_t *self = self_in;
 
@@ -678,9 +670,9 @@ STATIC mp_obj_t rp2_can_clear_trigger(mp_obj_t self_in)
 
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_can_clear_trigger_obj, rp2_can_clear_trigger);
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_can_clear_trigger_obj, rp2_can_clear_trigger);
 
-STATIC TIME_CRITICAL void pulse_trigger(void)
+static TIME_CRITICAL void pulse_trigger(void)
 {
     // Ensure pulse is long enough for even a slow logic analyzer (e.g. 20MHz) to see
     TRIG_SET();
@@ -698,7 +690,7 @@ STATIC TIME_CRITICAL void pulse_trigger(void)
 }
 
 // Put a pulse on the trigger pin
-STATIC mp_obj_t rp2_can_pulse_trigger(mp_obj_t self_in)
+static mp_obj_t rp2_can_pulse_trigger(mp_obj_t self_in)
 {
     // Not used
     // rp2_can_obj_t *self = self_in;
@@ -706,11 +698,11 @@ STATIC mp_obj_t rp2_can_pulse_trigger(mp_obj_t self_in)
     
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_can_pulse_trigger_obj, rp2_can_pulse_trigger);
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_can_pulse_trigger_obj, rp2_can_pulse_trigger);
 
 //////////////////////////////////////// TEST FUNCTIONS /////////////////////////////////////////
 
-STATIC mp_obj_t rp2_can_test_irq_init(void)
+static mp_obj_t rp2_can_test_irq_init(void)
 {
     CAN_DEBUG_PRINT("Enabling GPIO IRQ\n");
     gpio_set_irq_enabled(SPI_IRQ, EDGE_SENSITIVE_RISING, true);
@@ -720,64 +712,72 @@ STATIC mp_obj_t rp2_can_test_irq_init(void)
 
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_0(rp2_can_test_irq_init_fun_obj, rp2_can_test_irq_init);
-STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(rp2_can_test_irq_init_obj, MP_ROM_PTR(&rp2_can_test_irq_init_fun_obj));
+static MP_DEFINE_CONST_FUN_OBJ_0(rp2_can_test_irq_init_fun_obj, rp2_can_test_irq_init);
+static MP_DEFINE_CONST_STATICMETHOD_OBJ(rp2_can_test_irq_init_obj, MP_ROM_PTR(&rp2_can_test_irq_init_fun_obj));
 
-STATIC mp_obj_t rp2_can_test_irq_enable(void)
+static mp_obj_t rp2_can_test_irq_enable(mp_obj_t self_in)
 {
-    mcp2517fd_spi_gpio_enable_irq();
+    rp2_can_obj_t *self = self_in;
+    can_interface_t *spi_interface = &self->controller.host_interface;
+    mcp25xxfd_spi_gpio_enable_irq(spi_interface);
     CAN_DEBUG_PRINT("DISABLE_GPIO_INTERRUPTS() called\n");
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_0(rp2_can_test_irq_enable_fun_obj, rp2_can_test_irq_enable);
-STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(rp2_can_test_irq_enable_obj, MP_ROM_PTR(&rp2_can_test_irq_enable_fun_obj));
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_can_test_irq_enable_fun_obj, rp2_can_test_irq_enable);
+static MP_DEFINE_CONST_STATICMETHOD_OBJ(rp2_can_test_irq_enable_obj, MP_ROM_PTR(&rp2_can_test_irq_enable_fun_obj));
 
-STATIC mp_obj_t rp2_can_test_irq_disable(void)
+static mp_obj_t rp2_can_test_irq_disable(mp_obj_t self_in)
 {
-    mcp2517fd_spi_gpio_disable_irq();
+    rp2_can_obj_t *self = self_in;
+    can_interface_t *spi_interface = &self->controller.host_interface;
+    mcp25xxfd_spi_gpio_disable_irq(spi_interface);
     CAN_DEBUG_PRINT("ENABLE_GPIO_INTERRUPTS() called\n");
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_0(rp2_can_test_irq_disable_fun_obj, rp2_can_test_irq_disable);
-STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(rp2_can_test_irq_disable_obj, MP_ROM_PTR(&rp2_can_test_irq_disable_fun_obj));
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_can_test_irq_disable_fun_obj, rp2_can_test_irq_disable);
+static MP_DEFINE_CONST_STATICMETHOD_OBJ(rp2_can_test_irq_disable_obj, MP_ROM_PTR(&rp2_can_test_irq_disable_fun_obj));
 
-STATIC mp_obj_t rp2_can_test_spi_init(void)
+static mp_obj_t rp2_can_test_spi_init(mp_obj_t self_in)
 {
-    mcp2517fd_spi_gpio_disable_irq();
-    mcp2517fd_spi_pins_init();
-    mcp2517fd_spi_gpio_enable_irq();
+    rp2_can_obj_t *self = self_in;
+    can_interface_t *spi_interface = &self->controller.host_interface;
+    mcp25xxfd_spi_gpio_disable_irq(spi_interface);
+    mcp25xxfd_spi_pins_init(spi_interface);
+    mcp25xxfd_spi_gpio_enable_irq(spi_interface);
     CAN_DEBUG_PRINT("VTOR=0x%08"PRIx32"\n", scb_hw->vtor);
     for(int i = -16; i < 0x40; i++) {
         CAN_DEBUG_PRINT("VTOR[%d]=0x%08"PRIx32"\n", i, ((uint32_t *)(scb_hw->vtor))[i + 16]);
     }
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_0(rp2_can_test_spi_init_fun_obj, rp2_can_test_spi_init);
-STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(rp2_can_test_spi_init_obj, MP_ROM_PTR(&rp2_can_test_spi_init_fun_obj));
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_can_test_spi_init_fun_obj, rp2_can_test_spi_init);
+static MP_DEFINE_CONST_STATICMETHOD_OBJ(rp2_can_test_spi_init_obj, MP_ROM_PTR(&rp2_can_test_spi_init_fun_obj));
 
-STATIC mp_obj_t rp2_can_test_spi_set(void)
+static mp_obj_t rp2_can_test_spi_set(mp_obj_t self_in)
 {
-    mcp2517fd_spi_select();
+    rp2_can_obj_t *self = self_in;
+    can_interface_t *spi_interface = &self->controller.host_interface;
+    mcp25xxfd_spi_select(spi_interface);
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_0(rp2_can_test_spi_set_fun_obj, rp2_can_test_spi_set);
-STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(rp2_can_test_spi_set_obj, MP_ROM_PTR(&rp2_can_test_spi_set_fun_obj));
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_can_test_spi_set_fun_obj, rp2_can_test_spi_set);
+static MP_DEFINE_CONST_STATICMETHOD_OBJ(rp2_can_test_spi_set_obj, MP_ROM_PTR(&rp2_can_test_spi_set_fun_obj));
 
-STATIC mp_obj_t rp2_can_test_spi_deselect(void)
+static mp_obj_t rp2_can_test_spi_deselect(void)
 {
-    mcp2517fd_spi_deselect();
+    mcp25xxfd_spi_deselect();
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_0(rp2_can_test_spi_deselect_fun_obj, rp2_can_test_spi_deselect);
-STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(rp2_can_test_spi_deselect_obj, MP_ROM_PTR(&rp2_can_test_spi_deselect_fun_obj));
+static MP_DEFINE_CONST_FUN_OBJ_0(rp2_can_test_spi_deselect_fun_obj, rp2_can_test_spi_deselect);
+static MP_DEFINE_CONST_STATICMETHOD_OBJ(rp2_can_test_spi_deselect_obj, MP_ROM_PTR(&rp2_can_test_spi_deselect_fun_obj));
 
-STATIC mp_obj_t rp2_can_test_spi_write_word(mp_obj_t addr_obj, mp_obj_t word_obj)
+static mp_obj_t rp2_can_test_spi_write_word(mp_obj_t addr_obj, mp_obj_t word_obj)
 {
     uint32_t addr = mp_obj_get_int(addr_obj);
     uint32_t word = mp_obj_get_int(word_obj);
 
     CAN_DEBUG_PRINT("Writing word=0x%08"PRIx32"\n", word);
-    mcp2517fd_spi_gpio_disable_irq();
+    mcp25xxfd_spi_gpio_disable_irq();
     uint8_t buf[6];
     // MCP2517/18FD SPI transaction = command/addr, 4 bytes
     buf[0] = 0x20 | ((addr >> 8U) & 0xfU);
@@ -790,21 +790,21 @@ STATIC mp_obj_t rp2_can_test_spi_write_word(mp_obj_t addr_obj, mp_obj_t word_obj
     // SPI transaction
     // The Pico is little-endian so the first byte sent is the lowest-address, which is the
     // same as the RP2040
-    mcp2517fd_spi_select();
-    mcp2517fd_spi_write(buf, sizeof(buf));
-    mcp2517fd_spi_deselect();
-    mcp2517fd_spi_gpio_enable_irq();
+    mcp25xxfd_spi_select();
+    mcp25xxfd_spi_write(buf, sizeof(buf));
+    mcp25xxfd_spi_deselect();
+    mcp25xxfd_spi_gpio_enable_irq();
 
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_2(rp2_can_test_spi_write_word_fun_obj, rp2_can_test_spi_write_word);
-STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(rp2_can_test_spi_write_word_obj, MP_ROM_PTR(&rp2_can_test_spi_write_word_fun_obj));
+static MP_DEFINE_CONST_FUN_OBJ_2(rp2_can_test_spi_write_word_fun_obj, rp2_can_test_spi_write_word);
+static MP_DEFINE_CONST_STATICMETHOD_OBJ(rp2_can_test_spi_write_word_obj, MP_ROM_PTR(&rp2_can_test_spi_write_word_fun_obj));
 
-STATIC mp_obj_t rp2_can_test_spi_read_word(mp_obj_t addr_obj)
+static mp_obj_t rp2_can_test_spi_read_word(mp_obj_t addr_obj)
 {
     uint32_t addr = mp_obj_get_int(addr_obj);
 
-    mcp2517fd_spi_gpio_disable_irq();
+    mcp25xxfd_spi_gpio_disable_irq();
     uint8_t cmd[6];
     uint8_t resp[6];
 
@@ -817,39 +817,39 @@ STATIC mp_obj_t rp2_can_test_spi_read_word(mp_obj_t addr_obj)
     cmd[5] = 0xefU;
 
     // SPI transaction
-    mcp2517fd_spi_select();
-    mcp2517fd_spi_read_write(cmd, resp, sizeof(cmd));
-    mcp2517fd_spi_deselect();
+    mcp25xxfd_spi_select();
+    mcp25xxfd_spi_read_write(cmd, resp, sizeof(cmd));
+    mcp25xxfd_spi_deselect();
 
     uint32_t word = ((uint32_t)resp[2]) | ((uint32_t)resp[3] << 8) | ((uint32_t)resp[4] << 16) | ((uint32_t)resp[5] << 24);
-    mcp2517fd_spi_gpio_enable_irq();
+    mcp25xxfd_spi_gpio_enable_irq();
 
     CAN_DEBUG_PRINT("Read word=0x%08"PRIx32"\n", word);
     return mp_obj_new_int_from_ull(word);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_can_test_spi_read_word_fun_obj, rp2_can_test_spi_read_word);
-STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(rp2_can_test_spi_read_word_obj, MP_ROM_PTR(&rp2_can_test_spi_read_word_fun_obj));
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_can_test_spi_read_word_fun_obj, rp2_can_test_spi_read_word);
+static MP_DEFINE_CONST_STATICMETHOD_OBJ(rp2_can_test_spi_read_word_obj, MP_ROM_PTR(&rp2_can_test_spi_read_word_fun_obj));
 
-STATIC mp_obj_t rp2_can_test_spi_read_words(mp_obj_t addr_obj)
+static mp_obj_t rp2_can_test_spi_read_words(mp_obj_t addr_obj)
 {
     uint32_t words[4];
     uint32_t addr = mp_obj_get_int(addr_obj);
 
     uint8_t buf[2];
 
-    // MCP2517FD SPI transaction = command/addr, 4 bytes
+    // MCP25xxFD SPI transaction = command/addr, 4 bytes
     buf[0] = 0x30 | ((addr >> 8U) & 0xfU);
     buf[1] = addr & 0xffU;
 
-    mcp2517fd_spi_gpio_disable_irq();
+    mcp25xxfd_spi_gpio_disable_irq();
     // SPI transaction
-    mcp2517fd_spi_select();
+    mcp25xxfd_spi_select();
     // Send command, which flushes the pipeline then resumes
-    mcp2517fd_spi_write(buf, 2U);
+    mcp25xxfd_spi_write(buf, 2U);
     // Bulk data
-    mcp2517fd_spi_read((uint8_t *)(words), 16U);
-    mcp2517fd_spi_deselect();
-    mcp2517fd_spi_gpio_enable_irq();
+    mcp25xxfd_spi_read((uint8_t *)(words), 16U);
+    mcp25xxfd_spi_deselect();
+    mcp25xxfd_spi_gpio_enable_irq();
 
     mp_obj_tuple_t *tuple = mp_obj_new_tuple(4U, NULL);
     tuple->items[0] = mp_obj_new_int_from_ull(words[0]);
@@ -859,10 +859,10 @@ STATIC mp_obj_t rp2_can_test_spi_read_words(mp_obj_t addr_obj)
 
     return tuple;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_can_test_spi_read_words_fun_obj, rp2_can_test_spi_read_words);
-STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(rp2_can_test_spi_read_words_obj, MP_ROM_PTR(&rp2_can_test_spi_read_words_fun_obj));
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_can_test_spi_read_words_fun_obj, rp2_can_test_spi_read_words);
+static MP_DEFINE_CONST_STATICMETHOD_OBJ(rp2_can_test_spi_read_words_obj, MP_ROM_PTR(&rp2_can_test_spi_read_words_fun_obj));
 
-STATIC mp_obj_t rp2_can_test_spi_write_words(mp_obj_t addr_obj)
+static mp_obj_t rp2_can_test_spi_write_words(mp_obj_t addr_obj)
 {
     uint32_t addr = mp_obj_get_int(addr_obj);
     uint32_t words[4] = {0xdeadbeefU, 0xcafef00dU, 0x01e551caU, 0x01020304U};
@@ -883,19 +883,19 @@ STATIC mp_obj_t rp2_can_test_spi_write_words(mp_obj_t addr_obj)
     }
 
     // SPI transaction
-    mcp2517fd_spi_select();
-    mcp2517fd_spi_write(cmd, sizeof(cmd));
-    mcp2517fd_spi_deselect();
+    mcp25xxfd_spi_select();
+    mcp25xxfd_spi_write(cmd, sizeof(cmd));
+    mcp25xxfd_spi_deselect();
 
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_can_test_spi_write_words_fun_obj, rp2_can_test_spi_write_words);
-STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(rp2_can_test_spi_write_words_obj, MP_ROM_PTR(&rp2_can_test_spi_write_words_fun_obj));
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_can_test_spi_write_words_fun_obj, rp2_can_test_spi_write_words);
+static MP_DEFINE_CONST_STATICMETHOD_OBJ(rp2_can_test_spi_write_words_obj, MP_ROM_PTR(&rp2_can_test_spi_write_words_fun_obj));
 
 
-STATIC void rp2_can_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind)
+static void rp2_can_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind)
 {
-     rp2_can_obj_t *self = self_in;
+    rp2_can_obj_t *self = self_in;
 
     can_status_t status = can_get_status();
     uint32_t timestamp_timer = can_get_time();
@@ -943,7 +943,7 @@ STATIC void rp2_can_print(const mp_print_t *print, mp_obj_t self_in, mp_print_ki
     mp_printf(print, ")");
 }
 
-STATIC const mp_map_elem_t rp2_can_locals_dict_table[] = {
+static const mp_map_elem_t rp2_can_locals_dict_table[] = {
     ////// Instance methods
     { MP_OBJ_NEW_QSTR(MP_QSTR_send_frame), (mp_obj_t)&rp2_can_send_frame_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_send_frames), (mp_obj_t)&rp2_can_send_frames_obj },
@@ -1008,7 +1008,7 @@ STATIC const mp_map_elem_t rp2_can_locals_dict_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR_EVENT_TYPE_TRANSMITTED_FRAME), MP_OBJ_NEW_SMALL_INT(CAN_EVENT_TYPE_TRANSMITTED_FRAME) },
     { MP_OBJ_NEW_QSTR(MP_QSTR_EVENT_TYPE_RECEIVED_FRAME), MP_OBJ_NEW_SMALL_INT(CAN_EVENT_TYPE_RECEIVED_FRAME) },
 };
-STATIC MP_DEFINE_CONST_DICT(rp2_can_locals_dict, rp2_can_locals_dict_table);
+static MP_DEFINE_CONST_DICT(rp2_can_locals_dict, rp2_can_locals_dict_table);
 
 const mp_obj_type_t rp2_can_type = {
     { &mp_type_type },
@@ -1020,7 +1020,7 @@ const mp_obj_type_t rp2_can_type = {
 ////////////////////////////////////// End of CAN class //////////////////////////////////////
 
 ////////////////////////////////// Start of CANFrame class ///////////////////////////////////
-STATIC mp_obj_t rp2_canframe_make_new(const mp_obj_type_t *type, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *all_args)
+static mp_obj_t rp2_canframe_make_new(const mp_obj_type_t *type, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *all_args)
 {
     static const mp_arg_t allowed_args[] = {
         {MP_QSTR_canid,     MP_ARG_REQUIRED | MP_ARG_OBJ, {.u_obj = MP_OBJ_NULL}},
@@ -1086,7 +1086,7 @@ STATIC mp_obj_t rp2_canframe_make_new(const mp_obj_type_t *type, mp_uint_t n_arg
 }
 
 //////////////////////////// Static class method to create a list of CANFrame instances ///////////////////////////
-STATIC mp_obj_t rp2_canframe_from_bytes(mp_obj_t frames)
+static mp_obj_t rp2_canframe_from_bytes(mp_obj_t frames)
 {
     if (!MP_OBJ_IS_STR_OR_BYTES(frames)) {
         nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "String/bytes parameter expected"));
@@ -1120,11 +1120,11 @@ STATIC mp_obj_t rp2_canframe_from_bytes(mp_obj_t frames)
 
     return list;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_canframe_from_bytes_fun_obj, rp2_canframe_from_bytes);
-STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(rp2_canframe_from_bytes_obj, MP_ROM_PTR(&rp2_canframe_from_bytes_fun_obj));
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_canframe_from_bytes_fun_obj, rp2_canframe_from_bytes);
+static MP_DEFINE_CONST_STATICMETHOD_OBJ(rp2_canframe_from_bytes_obj, MP_ROM_PTR(&rp2_canframe_from_bytes_fun_obj));
 
 // Get the data as bytes
-STATIC mp_obj_t rp2_canframe_get_data(mp_obj_t self_in)
+static mp_obj_t rp2_canframe_get_data(mp_obj_t self_in)
 {
     rp2_canframe_obj_t *self = self_in;
 
@@ -1133,27 +1133,27 @@ STATIC mp_obj_t rp2_canframe_get_data(mp_obj_t self_in)
 
     return make_mp_bytes(data, len);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_canframe_get_data_obj, rp2_canframe_get_data);
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_canframe_get_data_obj, rp2_canframe_get_data);
 
-STATIC mp_obj_t rp2_canframe_get_dlc(mp_obj_t self_in)
+static mp_obj_t rp2_canframe_get_dlc(mp_obj_t self_in)
 {
     rp2_canframe_obj_t *self = self_in;
 
     return MP_OBJ_NEW_SMALL_INT(can_frame_get_dlc(&self->frame));
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_canframe_get_dlc_obj, rp2_canframe_get_dlc);
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_canframe_get_dlc_obj, rp2_canframe_get_dlc);
 
 // Get the frame's tag
-STATIC mp_obj_t rp2_canframe_get_tag(mp_obj_t self_in)
+static mp_obj_t rp2_canframe_get_tag(mp_obj_t self_in)
 {
     rp2_canframe_obj_t *self = self_in;
 
     return mp_obj_new_int_from_uint(self->tag);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_canframe_get_tag_obj, rp2_canframe_get_tag);
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_canframe_get_tag_obj, rp2_canframe_get_tag);
 
 // Returns the frame's timestamp, or None if no timestamp valid
-STATIC mp_obj_t rp2_canframe_get_timestamp(mp_obj_t self_in)
+static mp_obj_t rp2_canframe_get_timestamp(mp_obj_t self_in)
 {
     rp2_canframe_obj_t *self = self_in;
 
@@ -1165,37 +1165,37 @@ STATIC mp_obj_t rp2_canframe_get_timestamp(mp_obj_t self_in)
         return mp_const_none;
     }
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_canframe_get_timestamp_obj, rp2_canframe_get_timestamp);
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_canframe_get_timestamp_obj, rp2_canframe_get_timestamp);
 
 // Returns the ID acceptance filter that allowed through the frame
-STATIC mp_obj_t rp2_canframe_get_index(mp_obj_t self_in)
+static mp_obj_t rp2_canframe_get_index(mp_obj_t self_in)
 {
     rp2_canframe_obj_t *self = self_in;
 
     return MP_OBJ_NEW_SMALL_INT(can_frame_get_id_filter(&self->frame));
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_canframe_get_index_obj, rp2_canframe_get_index);
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_canframe_get_index_obj, rp2_canframe_get_index);
 
 // Returns True if the frame has an extended ID, False otherwise
-STATIC mp_obj_t rp2_canframe_is_extended(mp_obj_t self_in)
+static mp_obj_t rp2_canframe_is_extended(mp_obj_t self_in)
 {
     rp2_canframe_obj_t *self = self_in;
 
     return can_frame_is_extended(&self->frame) ? mp_const_true : mp_const_false;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_canframe_is_extended_obj, rp2_canframe_is_extended);
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_canframe_is_extended_obj, rp2_canframe_is_extended);
 
 // Returns True if the frame is a remote frame, False otherwise
-STATIC mp_obj_t rp2_canframe_is_remote(mp_obj_t self_in)
+static mp_obj_t rp2_canframe_is_remote(mp_obj_t self_in)
 {
     rp2_canframe_obj_t *self = self_in;
 
     return can_frame_is_remote(&self->frame) ? mp_const_true : mp_const_false;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_canframe_is_remote_obj, rp2_canframe_is_remote);
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_canframe_is_remote_obj, rp2_canframe_is_remote);
 
 // Get a CANID instance representing the frame's CAN ID
-STATIC mp_obj_t rp2_canframe_get_canid(mp_obj_t self_in)
+static mp_obj_t rp2_canframe_get_canid(mp_obj_t self_in)
 {
     rp2_canframe_obj_t *self = self_in;
     rp2_canid_obj_t *mp_canid = m_new_obj(rp2_canid_obj_t);
@@ -1205,18 +1205,18 @@ STATIC mp_obj_t rp2_canframe_get_canid(mp_obj_t self_in)
 
     return mp_canid;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_canframe_get_canid_obj, rp2_canframe_get_canid);
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_canframe_get_canid_obj, rp2_canframe_get_canid);
 
 // Get a numeric value for the CAN ID, with 11-bit IDs in the range 0..7ff
-STATIC mp_obj_t rp2_canframe_get_arbitration_id(mp_obj_t self_in)
+static mp_obj_t rp2_canframe_get_arbitration_id(mp_obj_t self_in)
 {
     rp2_canframe_obj_t *self = self_in;
 
     return MP_OBJ_NEW_SMALL_INT(can_frame_get_arbitration_id(&self->frame));
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_canframe_get_arbitration_id_obj, rp2_canframe_get_arbitration_id);
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_canframe_get_arbitration_id_obj, rp2_canframe_get_arbitration_id);
 
-STATIC void rp2_canframe_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind)
+static void rp2_canframe_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind)
 {
     rp2_canframe_obj_t *self = self_in;
     can_frame_t *frame = &self->frame;
@@ -1254,7 +1254,7 @@ STATIC void rp2_canframe_print(const mp_print_t *print, mp_obj_t self_in, mp_pri
     mp_printf(print, ")");
 }
 
-STATIC const mp_map_elem_t rp2_canframe_locals_dict_table[] = {
+static const mp_map_elem_t rp2_canframe_locals_dict_table[] = {
     // Instance methods
     { MP_OBJ_NEW_QSTR(MP_QSTR_is_remote), (mp_obj_t)&rp2_canframe_is_remote_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_get_canid), (mp_obj_t)&rp2_canframe_get_canid_obj },
@@ -1270,7 +1270,7 @@ STATIC const mp_map_elem_t rp2_canframe_locals_dict_table[] = {
     // Constants
     { MP_OBJ_NEW_QSTR(MP_QSTR_FROM_BYTES_NUM), MP_OBJ_NEW_SMALL_INT(FRAME_FROM_BYTES_NUM) },
 };
-STATIC MP_DEFINE_CONST_DICT(rp2_canframe_locals_dict, rp2_canframe_locals_dict_table);
+static MP_DEFINE_CONST_DICT(rp2_canframe_locals_dict, rp2_canframe_locals_dict_table);
 
 const mp_obj_type_t rp2_canframe_type = {
     { &mp_type_type },
@@ -1283,7 +1283,7 @@ const mp_obj_type_t rp2_canframe_type = {
 
 ////////////////////////////////////// Start of CANID class //////////////////////////////////////
 // Create the CANID instance and initialize the controller
-STATIC mp_obj_t rp2_canid_make_new(const mp_obj_type_t *type, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *all_args)
+static mp_obj_t rp2_canid_make_new(const mp_obj_type_t *type, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *all_args)
 {
     static const mp_arg_t allowed_args[] = {
         {MP_QSTR_arbitration_id,       MP_ARG_REQUIRED | MP_ARG_INT, {.u_int = 0x7ffU}},
@@ -1316,25 +1316,25 @@ STATIC mp_obj_t rp2_canid_make_new(const mp_obj_type_t *type, mp_uint_t n_args, 
 }
 
 // Get a numeric value for the CAN ID, with 11-bit IDs in the range 0..7ff
-STATIC mp_obj_t rp2_canid_get_arbitration_id(mp_obj_t self_in)
+static mp_obj_t rp2_canid_get_arbitration_id(mp_obj_t self_in)
 {
     rp2_canid_obj_t *self = self_in;
 
     return MP_OBJ_NEW_SMALL_INT(self->arbitration_id);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_canid_get_arbitration_id_obj, rp2_canid_get_arbitration_id);
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_canid_get_arbitration_id_obj, rp2_canid_get_arbitration_id);
 
 // Returns True if the ID is an extended ID, False otherwise
-STATIC mp_obj_t rp2_canid_is_extended(mp_obj_t self_in)
+static mp_obj_t rp2_canid_is_extended(mp_obj_t self_in)
 {
     rp2_canid_obj_t *self = self_in;
 
     return self->extended ? mp_const_true : mp_const_false;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_canid_is_extended_obj, rp2_canid_is_extended);
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_canid_is_extended_obj, rp2_canid_is_extended);
 
 // Get a CANID instance that will filter this ID
-STATIC mp_obj_t rp2_canid_get_id_filter(mp_obj_t self_in)
+static mp_obj_t rp2_canid_get_id_filter(mp_obj_t self_in)
 {
     rp2_canid_obj_t *self = self_in;
     rp2_canidfilter_obj_t *mp_filter = m_new_obj(rp2_canidfilter_obj_t);
@@ -1345,9 +1345,9 @@ STATIC mp_obj_t rp2_canid_get_id_filter(mp_obj_t self_in)
 
     return mp_filter;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_canid_get_id_filter_obj, rp2_canid_get_id_filter);
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_canid_get_id_filter_obj, rp2_canid_get_id_filter);
 
-STATIC void rp2_canid_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind)
+static void rp2_canid_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind)
 {
     rp2_canid_obj_t *self = self_in;
 
@@ -1359,13 +1359,13 @@ STATIC void rp2_canid_print(const mp_print_t *print, mp_obj_t self_in, mp_print_
     }
 }
 
-STATIC const mp_map_elem_t rp2_canid_locals_dict_table[] = {
+static const mp_map_elem_t rp2_canid_locals_dict_table[] = {
     // Instance methods
     { MP_OBJ_NEW_QSTR(MP_QSTR_get_arbitration_id), (mp_obj_t)&rp2_canid_get_arbitration_id_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_is_extended), (mp_obj_t)&rp2_canid_is_extended_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_get_id_filter), (mp_obj_t)&rp2_canid_get_id_filter_obj },
 };
-STATIC MP_DEFINE_CONST_DICT(rp2_canid_locals_dict, rp2_canid_locals_dict_table);
+static MP_DEFINE_CONST_DICT(rp2_canid_locals_dict, rp2_canid_locals_dict_table);
 
 const mp_obj_type_t rp2_canid_type = {
     { &mp_type_type },
@@ -1378,7 +1378,7 @@ const mp_obj_type_t rp2_canid_type = {
 
 ///////////////////////////////// Start of CANIDFilter class ///////////////////////////////////
 // Create the CANID instance and initialize the controller
-STATIC mp_obj_t rp2_canidfilter_make_new(const mp_obj_type_t *type, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *all_args)
+static mp_obj_t rp2_canidfilter_make_new(const mp_obj_type_t *type, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *all_args)
 {
     static const mp_arg_t allowed_args[] = {
         {MP_QSTR_filter_str,     MP_ARG_OBJ, {.u_obj = MP_OBJ_NULL}},
@@ -1440,7 +1440,7 @@ STATIC mp_obj_t rp2_canidfilter_make_new(const mp_obj_type_t *type, mp_uint_t n_
     return self;
 }
 
-STATIC void rp2_canidfilter_print_mask(const mp_print_t *print, bool extended, uint32_t mask, uint32_t match)
+static void rp2_canidfilter_print_mask(const mp_print_t *print, bool extended, uint32_t mask, uint32_t match)
 {
     uint32_t size = extended ? 29U : 11U;
     for(uint32_t i = 0; i < size; i++) {
@@ -1460,7 +1460,7 @@ STATIC void rp2_canidfilter_print_mask(const mp_print_t *print, bool extended, u
     }
 }
 
-STATIC void rp2_canidfilter_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind)
+static void rp2_canidfilter_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind)
 {
     rp2_canidfilter_obj_t *self = self_in;
     can_id_filter_t *filter = &self->filter;
@@ -1481,10 +1481,10 @@ STATIC void rp2_canidfilter_print(const mp_print_t *print, mp_obj_t self_in, mp_
     mp_printf(print, ")");
 }
 
-STATIC const mp_map_elem_t rp2_canidfilter_locals_dict_table[] = {
+static const mp_map_elem_t rp2_canidfilter_locals_dict_table[] = {
     // Instance methods
 };
-STATIC MP_DEFINE_CONST_DICT(rp2_canidfilter_locals_dict, rp2_canidfilter_locals_dict_table);
+static MP_DEFINE_CONST_DICT(rp2_canidfilter_locals_dict, rp2_canidfilter_locals_dict_table);
 
 const mp_obj_type_t rp2_canidfilter_type = {
         { &mp_type_type },
@@ -1498,7 +1498,7 @@ const mp_obj_type_t rp2_canidfilter_type = {
 
 ////////////////////////////////////// Start of CANError class //////////////////////////////////////
 // Create the CANError instance
-STATIC mp_obj_t rp2_canerror_make_new(const mp_obj_type_t *type, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *all_args)
+static mp_obj_t rp2_canerror_make_new(const mp_obj_type_t *type, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *all_args)
 {
     static const mp_arg_t allowed_args[] = {
         {MP_QSTR_details,    MP_ARG_REQUIRED | MP_ARG_INT, {.u_int = 0}},
@@ -1521,78 +1521,78 @@ STATIC mp_obj_t rp2_canerror_make_new(const mp_obj_type_t *type, mp_uint_t n_arg
 }
 
 // Returns the error frame's timestamp, or None if no timestamp valid
-STATIC mp_obj_t rp2_canerror_get_timestamp(mp_obj_t self_in)
+static mp_obj_t rp2_canerror_get_timestamp(mp_obj_t self_in)
 {
     rp2_canerror_obj_t *self = self_in;
 
     return mp_obj_new_int_from_uint(self->timestamp);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_canerror_get_timestamp_obj, rp2_canerror_get_timestamp);
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_canerror_get_timestamp_obj, rp2_canerror_get_timestamp);
 
-STATIC mp_obj_t rp2_canerror_is_crc_error(mp_obj_t self_in)
+static mp_obj_t rp2_canerror_is_crc_error(mp_obj_t self_in)
 {
     rp2_canerror_obj_t *self = self_in;
     can_error_t *e = &self->error;
 
     return can_error_is_crc(e) ? mp_const_true : mp_const_false;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_canerror_is_crc_error_obj, rp2_canerror_is_crc_error);
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_canerror_is_crc_error_obj, rp2_canerror_is_crc_error);
 
-STATIC mp_obj_t rp2_canerror_is_stuff_error(mp_obj_t self_in)
+static mp_obj_t rp2_canerror_is_stuff_error(mp_obj_t self_in)
 {
     rp2_canerror_obj_t *self = self_in;
     can_error_t *e = &self->error;
 
     return can_error_is_stuff(e) ? mp_const_true : mp_const_false;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_canerror_is_stuff_error_obj, rp2_canerror_is_stuff_error);
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_canerror_is_stuff_error_obj, rp2_canerror_is_stuff_error);
 
-STATIC mp_obj_t rp2_canerror_is_form_error(mp_obj_t self_in)
+static mp_obj_t rp2_canerror_is_form_error(mp_obj_t self_in)
 {
     rp2_canerror_obj_t *self = self_in;
     can_error_t *e = &self->error;
 
     return can_error_is_form(e) ? mp_const_true : mp_const_false;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_canerror_is_form_error_obj, rp2_canerror_is_form_error);
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_canerror_is_form_error_obj, rp2_canerror_is_form_error);
 
-STATIC mp_obj_t rp2_canerror_is_ack_error(mp_obj_t self_in)
+static mp_obj_t rp2_canerror_is_ack_error(mp_obj_t self_in)
 {
     rp2_canerror_obj_t *self = self_in;
     can_error_t *e = &self->error;
 
     return can_error_is_ack(e) ? mp_const_true : mp_const_false;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_canerror_is_ack_error_obj, rp2_canerror_is_ack_error);
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_canerror_is_ack_error_obj, rp2_canerror_is_ack_error);
 
-STATIC mp_obj_t rp2_canerror_is_bit1_error(mp_obj_t self_in)
+static mp_obj_t rp2_canerror_is_bit1_error(mp_obj_t self_in)
 {
     rp2_canerror_obj_t *self = self_in;
     can_error_t *e = &self->error;
 
     return can_error_is_bit1(e) ? mp_const_true : mp_const_false;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_canerror_is_bit1_error_obj, rp2_canerror_is_bit1_error);
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_canerror_is_bit1_error_obj, rp2_canerror_is_bit1_error);
 
-STATIC mp_obj_t rp2_canerror_is_bit0_error(mp_obj_t self_in)
+static mp_obj_t rp2_canerror_is_bit0_error(mp_obj_t self_in)
 {
     rp2_canerror_obj_t *self = self_in;
     can_error_t *e = &self->error;
 
     return can_error_is_bit0(e) ? mp_const_true : mp_const_false;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_canerror_is_bit0_error_obj, rp2_canerror_is_bit0_error);
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_canerror_is_bit0_error_obj, rp2_canerror_is_bit0_error);
 
-STATIC mp_obj_t rp2_canerror_is_bus_off(mp_obj_t self_in)
+static mp_obj_t rp2_canerror_is_bus_off(mp_obj_t self_in)
 {
     rp2_canerror_obj_t *self = self_in;
     can_error_t *e = &self->error;
 
     return can_error_is_bus_off(e) ? mp_const_true : mp_const_false;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_canerror_is_bus_off_obj, rp2_canerror_is_bus_off);
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_canerror_is_bus_off_obj, rp2_canerror_is_bus_off);
 
-STATIC void rp2_canerror_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind)
+static void rp2_canerror_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind)
 {
     rp2_canerror_obj_t *self = self_in;
     can_error_t *e = &self->error;
@@ -1651,7 +1651,7 @@ STATIC void rp2_canerror_print(const mp_print_t *print, mp_obj_t self_in, mp_pri
     mp_printf(print, "frame_cnt=%d, timestamp=%lu)", can_error_get_frame_cnt(e), self->timestamp);
 }
 
-STATIC const mp_map_elem_t rp2_canerror_locals_dict_table[] = {
+static const mp_map_elem_t rp2_canerror_locals_dict_table[] = {
         // Instance methods
         { MP_OBJ_NEW_QSTR(MP_QSTR_get_timestamp), (mp_obj_t)&rp2_canerror_get_timestamp_obj },
         { MP_OBJ_NEW_QSTR(MP_QSTR_is_crc_error), (mp_obj_t)&rp2_canerror_is_crc_error_obj },
@@ -1662,7 +1662,7 @@ STATIC const mp_map_elem_t rp2_canerror_locals_dict_table[] = {
         { MP_OBJ_NEW_QSTR(MP_QSTR_is_bit0_error), (mp_obj_t)&rp2_canerror_is_bit0_error_obj },
         { MP_OBJ_NEW_QSTR(MP_QSTR_is_bus_off), (mp_obj_t)&rp2_canerror_is_bus_off_obj },
 };
-STATIC MP_DEFINE_CONST_DICT(rp2_canerror_locals_dict, rp2_canerror_locals_dict_table);
+static MP_DEFINE_CONST_DICT(rp2_canerror_locals_dict, rp2_canerror_locals_dict_table);
 
 const mp_obj_type_t rp2_canerror_type = {
         { &mp_type_type },
@@ -1675,7 +1675,7 @@ const mp_obj_type_t rp2_canerror_type = {
 
 ///////////////////////////////////// Start of CANOverflow class //////////////////////////////////
 // Create the CANOverflow instance
-STATIC mp_obj_t rp2_canoverflow_make_new(const mp_obj_type_t *type, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *all_args)
+static mp_obj_t rp2_canoverflow_make_new(const mp_obj_type_t *type, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *all_args)
 {
     static const mp_arg_t allowed_args[] = {
     };
@@ -1694,25 +1694,25 @@ STATIC mp_obj_t rp2_canoverflow_make_new(const mp_obj_type_t *type, mp_uint_t n_
 }
 
 // Returns the overflow frame count
-STATIC mp_obj_t rp2_canoverflow_get_timestamp(mp_obj_t self_in)
+static mp_obj_t rp2_canoverflow_get_timestamp(mp_obj_t self_in)
 {
     rp2_canoverflow_obj_t *self = self_in;
 
     return mp_obj_new_int_from_uint(self->timestamp);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_canoverflow_get_timestamp_obj, rp2_canoverflow_get_timestamp);
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_canoverflow_get_timestamp_obj, rp2_canoverflow_get_timestamp);
 
 // Returns the overflow frame count
-STATIC mp_obj_t rp2_canoverflow_get_frame_cnt(mp_obj_t self_in)
+static mp_obj_t rp2_canoverflow_get_frame_cnt(mp_obj_t self_in)
 {
     rp2_canoverflow_obj_t *self = self_in;
 
     return mp_obj_new_int_from_uint(self->frame_cnt);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_canoverflow_get_frame_cnt_obj, rp2_canoverflow_get_frame_cnt);
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_canoverflow_get_frame_cnt_obj, rp2_canoverflow_get_frame_cnt);
 
 // Returns the overflow error count
-STATIC mp_obj_t rp2_canoverflow_get_error_cnt(mp_obj_t self_in)
+static mp_obj_t rp2_canoverflow_get_error_cnt(mp_obj_t self_in)
 {
     rp2_canoverflow_obj_t *self = self_in;
 
@@ -1723,9 +1723,9 @@ STATIC mp_obj_t rp2_canoverflow_get_error_cnt(mp_obj_t self_in)
         return mp_const_none;
     }
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(rp2_canoverflow_get_error_cnt_obj, rp2_canoverflow_get_error_cnt);
+static MP_DEFINE_CONST_FUN_OBJ_1(rp2_canoverflow_get_error_cnt_obj, rp2_canoverflow_get_error_cnt);
 
-STATIC void rp2_canoverflow_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind)
+static void rp2_canoverflow_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind)
 {
     rp2_canoverflow_obj_t *self = self_in;
     if (self->receive) {
@@ -1736,13 +1736,13 @@ STATIC void rp2_canoverflow_print(const mp_print_t *print, mp_obj_t self_in, mp_
     }
 }
 
-STATIC const mp_map_elem_t rp2_canoverflow_locals_dict_table[] = {
+static const mp_map_elem_t rp2_canoverflow_locals_dict_table[] = {
         // Instance methods
         { MP_OBJ_NEW_QSTR(MP_QSTR_get_frame_cnt), (mp_obj_t)&rp2_canoverflow_get_frame_cnt_obj },
         { MP_OBJ_NEW_QSTR(MP_QSTR_get_error_cnt), (mp_obj_t)&rp2_canoverflow_get_error_cnt_obj },
         { MP_OBJ_NEW_QSTR(MP_QSTR_get_timestamp), (mp_obj_t)&rp2_canoverflow_get_timestamp_obj },
 };
-STATIC MP_DEFINE_CONST_DICT(rp2_canoverflow_locals_dict, rp2_canoverflow_locals_dict_table);
+static MP_DEFINE_CONST_DICT(rp2_canoverflow_locals_dict, rp2_canoverflow_locals_dict_table);
 
 const mp_obj_type_t rp2_canoverflow_type = {
         { &mp_type_type },
